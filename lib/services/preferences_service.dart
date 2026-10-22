@@ -11,6 +11,30 @@ class PreferencesService {
   bool? _cachedHasSeenOnboarding;
   ThemeMode? _cachedThemeMode;
   File? _preferencesFile;
+  Future<void> _pendingWrite = Future<void>.value();
+
+  // Keep read-modify-write operations and resets in invocation order.
+  Future<void> _enqueueWrite(Future<void> Function() operation) {
+    final write = _pendingWrite.then((_) => operation());
+    _pendingWrite = write.catchError((Object error) {
+      debugPrint('PreferencesService persistence error: $error');
+    });
+    return _pendingWrite;
+  }
+
+  Future<void> _writeValue(String key, Object value) async {
+    final file = await _getFile();
+    Map<String, dynamic> data = {};
+    if (await file.exists()) {
+      try {
+        data = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      } catch (_) {
+        data = {};
+      }
+    }
+    data[key] = value;
+    await file.writeAsString(jsonEncode(data));
+  }
 
   static const String _preferencesFileName = 'resinc_preferences.json';
   static const String _keyHasSeenOnboarding = 'has_seen_onboarding';
@@ -20,18 +44,20 @@ class PreferencesService {
     this.directoryProvider,
     bool? initialHasSeenOnboarding,
     ThemeMode? initialThemeMode,
-  })  : _cachedHasSeenOnboarding = initialHasSeenOnboarding ??
-            (directoryProvider == null &&
-                    !kIsWeb &&
-                    Platform.environment.containsKey('FLUTTER_TEST')
-                ? true
-                : null),
-        _cachedThemeMode = initialThemeMode ??
-            (directoryProvider == null &&
-                    !kIsWeb &&
-                    Platform.environment.containsKey('FLUTTER_TEST')
-                ? ThemeMode.dark
-                : null);
+  }) : _cachedHasSeenOnboarding =
+           initialHasSeenOnboarding ??
+           (directoryProvider == null &&
+                   !kIsWeb &&
+                   Platform.environment.containsKey('FLUTTER_TEST')
+               ? true
+               : null),
+       _cachedThemeMode =
+           initialThemeMode ??
+           (directoryProvider == null &&
+                   !kIsWeb &&
+                   Platform.environment.containsKey('FLUTTER_TEST')
+               ? ThemeMode.dark
+               : null);
 
   static String themeModeToString(ThemeMode mode) {
     switch (mode) {
@@ -95,24 +121,9 @@ class PreferencesService {
   }
 
   /// Updates whether the user has seen the onboarding welcome sheet.
-  Future<void> setHasSeenOnboarding(bool value) async {
+  Future<void> setHasSeenOnboarding(bool value) {
     _cachedHasSeenOnboarding = value;
-    try {
-      final file = await _getFile();
-      Map<String, dynamic> data = {};
-      if (await file.exists()) {
-        try {
-          final content = await file.readAsString();
-          data = jsonDecode(content) as Map<String, dynamic>;
-        } catch (_) {
-          data = {};
-        }
-      }
-      data[_keyHasSeenOnboarding] = value;
-      await file.writeAsString(jsonEncode(data));
-    } catch (e) {
-      debugPrint('PreferencesService.setHasSeenOnboarding error: $e');
-    }
+    return _enqueueWrite(() => _writeValue(_keyHasSeenOnboarding, value));
   }
 
   /// Retrieves the saved ThemeMode, or defaults to [defaultMode].
@@ -144,37 +155,22 @@ class PreferencesService {
   }
 
   /// Persists the selected ThemeMode.
-  Future<void> setThemeMode(ThemeMode mode) async {
+  Future<void> setThemeMode(ThemeMode mode) {
     _cachedThemeMode = mode;
-    try {
-      final file = await _getFile();
-      Map<String, dynamic> data = {};
-      if (await file.exists()) {
-        try {
-          final content = await file.readAsString();
-          data = jsonDecode(content) as Map<String, dynamic>;
-        } catch (_) {
-          data = {};
-        }
-      }
-      data[_keyThemeMode] = themeModeToString(mode);
-      await file.writeAsString(jsonEncode(data));
-    } catch (e) {
-      debugPrint('PreferencesService.setThemeMode error: $e');
-    }
+    return _enqueueWrite(
+      () => _writeValue(_keyThemeMode, themeModeToString(mode)),
+    );
   }
 
   /// Clears stored preferences (useful for testing or resetting app tour).
-  Future<void> resetPreferences() async {
+  Future<void> resetPreferences() {
     _cachedHasSeenOnboarding = false;
     _cachedThemeMode = null;
-    try {
+    return _enqueueWrite(() async {
       final file = await _getFile();
       if (await file.exists()) {
         await file.delete();
       }
-    } catch (e) {
-      debugPrint('PreferencesService.resetPreferences error: $e');
-    }
+    });
   }
 }
