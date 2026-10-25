@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../widgets/file_preview.dart';
+
 import '../../../models/image_metadata.dart';
 import '../../../utils/constants.dart';
 import '../../../utils/file_utils.dart';
@@ -52,7 +54,7 @@ class LoadedImagePreviewCard extends StatelessWidget {
                 child: SizedBox(
                   width: 48,
                   height: 48,
-                  child: Image.file(File(metadata.path), fit: BoxFit.cover),
+                  child: FilePreview(File(metadata.path), fit: BoxFit.cover),
                 ),
               ),
               const SizedBox(width: 10),

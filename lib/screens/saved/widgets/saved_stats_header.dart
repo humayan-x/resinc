@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../utils/constants.dart';
 import '../../../utils/file_utils.dart';
 
-/// Top header for the Saved tab displaying total saved disk space, count, and clear action.
+/// Top header for the Saved tab displaying total file-size reduction, count, and clear action.
 class SavedStatsHeader extends StatelessWidget {
   final int totalSavedBytes;
   final int itemCount;
@@ -46,7 +46,7 @@ class SavedStatsHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
-              Icons.savings_outlined,
+              Icons.compress_rounded,
               color: AppConstants.primaryAccent,
               size: 26,
             ),
@@ -65,7 +65,11 @@ class SavedStatsHeader extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'Saved across $itemCount saved images',
+                  'File-size reduction across $itemCount images',
+                  style: TextStyle(color: mutedColor, fontSize: 12),
+                ),
+                Text(
+                  'Compared with originals, not freed storage.',
                   style: TextStyle(color: mutedColor, fontSize: 12),
                 ),
               ],
@@ -102,7 +106,7 @@ class SavedStatsHeader extends StatelessWidget {
           style: TextStyle(color: textColor),
         ),
         content: Text(
-          'This will remove saved image references from this list. Photos saved to your device gallery will remain untouched.',
+          'This removes local photo copies and their history. Photos in your device gallery remain untouched.',
           style: TextStyle(color: mutedColor, fontSize: 13),
         ),
         actions: [

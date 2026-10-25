@@ -21,6 +21,7 @@ class SavedController extends ChangeNotifier {
 
   List<SavedItem> _items = [];
   bool _isLoading = false;
+  bool _isMutating = false;
   int _totalSavedBytes = 0;
   String? _errorMessage;
 
@@ -28,12 +29,18 @@ class SavedController extends ChangeNotifier {
 
   List<SavedItem> get items => _items;
   bool get isLoading => _isLoading;
+  bool get isBusy => _isLoading || _isMutating;
   int get totalSavedBytes => _totalSavedBytes;
+
+  /// Photo bytes held in app storage, excluding sidecars and gallery copies.
+  int get localPhotoBytes =>
+      _items.fold(0, (total, item) => total + item.fileSizeBytes);
   int get itemCount => _items.length;
   String? get errorMessage => _errorMessage;
 
-  /// Loads saved items and aggregates storage savings
+  /// Loads saved items and aggregates file-size reductions
   Future<void> loadSaved() async {
+    if (_disposed || isBusy) return;
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -42,41 +49,59 @@ class SavedController extends ChangeNotifier {
       _items = await savedService.loadSavedItems();
       _totalSavedBytes = savedService.calculateTotalSavedBytes(_items);
     } catch (e) {
-      _errorMessage = 'Failed to load saved items: ${e.toString()}';
+      _errorMessage =
+          'Could not load saved history. Please refresh to try again.';
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Removes an individual item from saved references
-  Future<void> deleteItem(SavedItem item) async {
-    try {
-      await savedService.deleteItem(item);
-      _items.removeWhere((i) => i.id == item.id);
-      _totalSavedBytes = savedService.calculateTotalSavedBytes(_items);
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to delete item: ${e.toString()}';
-      notifyListeners();
-    }
-  }
+  /// Report success only after the files have been removed.
+  Future<bool> deleteItem(SavedItem item) =>
+      _mutate(() => savedService.deleteItem(item), () {
+        _items.removeWhere((i) => i.id == item.id);
+        _totalSavedBytes = savedService.calculateTotalSavedBytes(_items);
+      }, 'Could not remove this saved item. Refresh the list and try again.');
 
-  /// Clears all saved references
-  Future<void> clearSaved() async {
-    try {
-      await savedService.clearSaved();
+  Future<bool> clearSaved() => _mutate(
+    savedService.clearSaved,
+    () {
       _items.clear();
       _totalSavedBytes = 0;
-      notifyListeners();
-    } catch (e) {
-      _errorMessage = 'Failed to clear saved items: ${e.toString()}';
+    },
+    'Could not clear all saved items. Some files may have been removed. '
+    'Refresh the list and try again.',
+  );
+
+  Future<bool> _mutate(
+    Future<void> Function() operation,
+    VoidCallback onSuccess,
+    String failureMessage,
+  ) async {
+    if (_disposed || isBusy) return false;
+    _isMutating = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await operation();
+      if (_disposed) return false;
+      onSuccess();
+      return true;
+    } catch (_) {
+      _errorMessage = failureMessage;
+      return false;
+    } finally {
+      _isMutating = false;
       notifyListeners();
     }
   }
 
   /// Shares a saved item via the system share sheet
   Future<void> shareItem(SavedItem item) async {
+    if (_disposed || isBusy) return;
+    _errorMessage = null;
+    notifyListeners();
     try {
       await SharePlus.instance.share(
         ShareParams(

@@ -19,21 +19,31 @@
 
 ---
 
+## v1.0.1
+
+Version **1.0.1**, Android build **2**. See [CHANGELOG.md](CHANGELOG.md) for release notes.
+
+- Native background processing for crop and optimization, with one decoded bitmap per job.
+- Smaller previews and bounded processing sizes for large photos.
+- Recovery of interrupted Android photo selections and safer saved-history handling.
+- Correct original-size comparisons after cropping, separate local-storage figures, and visible history errors.
+- Compact crops, white Apply Crop text, and a text-only home header.
+
 ## 🚀 Overview
 
 **ReSinc** is a fast, privacy-first, on-device Android image optimization utility built with Flutter. It helps you shrink and downscale photos to strictly guaranteed file sizes (such as `< 100 KB` or `< 500 KB` for portals, emails, or KYC forms) without guesswork.
 
 - **Zero Cloud / 100% On-Device:** Zero internet permissions declared in the Android manifest (`android.permission.INTERNET` is omitted). Photos never leave your hardware.
-- **Strict Size Ceilings:** Uses an iterative binary-search compression engine to guarantee files land under target KB limits.
+- **Strict Size Ceilings:** Uses native background image processing and verifies files land under target KB limits.
 - **Privacy Scrubbing:** Strips sensitive GPS coordinates, device serial numbers, and camera metadata on export.
-- **Hardware Accelerated:** Leverages platform-native image decoders for low memory overhead and rapid processing (< 400 ms).
+- **Background Processing:** Android decodes once and reuses a native bitmap for cropping, resizing, and JPEG attempts on a serial background task queue. Processing time depends on the photo and device.
 
 ---
 
 ## ✨ Features
 
 ### 1. 🎛️ Workbench (Tab 1: Home & Compression)
-- **Top Bar Branding:** Clean `ReSinc` logo header with Quick Guide and Dark/Light theme toggle.
+- **Top Bar Branding:** Text-only `ReSinc` header with Quick Guide and Dark/Light theme toggle.
 - **Full-Screen Intake:** Large tap-to-select area with rounded dashed border opens the gallery with a single touch.
 - **Image Inspection:** Preview thumbnail with file name, original size, pixel dimensions, and detected EXIF count.
 - **Crop Tool:** Integrated aspect-ratio cropping (Freeform, 1:1, 4:3, 16:9) with interactive corner handles.
@@ -46,9 +56,9 @@
   - Floating action buttons: **Save** to gallery, **Change Presets**, and **Share**.
 
 ### 2. 📁 Saved (Tab 2: Processed History)
-- **Cumulative Space Saved Counter:** Real-time stats header showing total disk space saved (e.g., `48.5 MB saved`).
+- **File-size Reduction Counter:** Compares exported file sizes with the original selected photos, including after cropping. This is not disk space freed: originals, gallery exports, and local saved copies are retained.
 - **3-Column Grid:** Clean square image grid with fast offline `.meta` sidecar caching.
-- **Automatic Gallery Sync:** Real-time synchronization detecting when an image is deleted from the phone's native Gallery or Google Photos app, automatically purging stale references and cached previews upon app resumption.
+- **Automatic Gallery Sync:** Checks saved photos when the app resumes and removes confirmed stale references. Failed checks preserve local history.
 - **Detail Modal Dialog:** Fullscreen inspection dialog displaying exact dimensions, file format, savings percentage, creation date, and EXIF status, with one-tap Share, Open in Gallery, and Delete actions.
 - **Storage Management:** Single-tap "Clear Saved References" cache cleaner.
 
@@ -57,8 +67,8 @@
 - **Guides & Transparency Hub:** Dedicated pages explaining:
   - *How ReSinc Works* (Typographic onboarding walkthrough)
   - *Offline Architecture* (Zero-network security model)
-  - *Algorithm Transparency* (Binary-search quality estimation & aspect-ratio scaling)
-- **Storage Statistics:** Inspect total saved reference count and disk space reclaimed.
+  - *Algorithm Transparency* (Native background processing & aspect-ratio scaling)
+- **Storage Statistics:** Inspect the saved reference count and the bytes used by local photo copies (excluding history metadata and gallery copies).
 - **Open Source Links:** Direct links to the GitHub repository, issue tracker, and MIT license.
 
 ---
@@ -83,17 +93,19 @@ When compressing toward a strict ceiling (e.g. `< 100 KB`):
 ```mermaid
 flowchart TD
     A["Select Image"] --> B["Extract & Strip EXIF/GPS"]
-    B --> C["Binary Search Quality (15 - 95)"]
+    B --> C["Try JPEG Quality 85, 65, 45"]
     C --> D{"File <= Target KB?"}
     D -- Yes --> E["Verify Optimal Candidate"]
-    D -- No --> F["Downscale Resolution (0.75x factor)"]
+    D -- No --> F["Downscale Based on Measured Size"]
     F --> C
-    E --> G["Output Optimized Image (< 400ms)"]
+    E --> G["Output Verified Optimized Image"]
 ```
 
-1. **Iterative Binary Search on Quality:** Probes JPEG quality values between `15` and `95` to find the highest fidelity buffer that satisfies `output_bytes <= target_bytes`.
-2. **Resolution Downscaling Fallback:** If high-resolution detail cannot fit at minimum quality, the engine scales dimensions down by `0.75x` steps while maintaining aspect ratio.
-3. **Platform Decoders:** Calls native Android platform decoders directly via `flutter_image_compress` for hardware acceleration in native memory.
+1. **Native Android worker:** One platform-channel call runs decoding, orientation correction, optional cropping, scaling, and JPEG encoding on a background task queue. Pixels stay in native memory; no intermediate PNG is needed.
+2. **Fast quality trials:** KB targets try qualities 85, 65, and 45, stopping at the first verified fit. Resolution presets encode once at their configured quality. This favors speed over finding the absolute highest quality below the ceiling.
+3. **Adaptive resizing:** If necessary, reduce dimensions based on measured bytes and retry from the retained bitmap. EXIF is written before verifying the final byte size. The existing Dart processing path remains available outside Android.
+
+Processing decodes are limited to 4 megapixels and a 2560-pixel longest edge to keep large camera photos manageable. Resolution presets apply their smaller limit during decoding; smaller inputs are never enlarged. KB targets still verify the final encoded byte size.
 
 ---
 
@@ -119,7 +131,7 @@ lib/
 │   ├── settings/                      # Tab 3: Themes, guides, and storage
 │   └── workbench/                     # Tab 1: Image intake & compression HUD
 ├── services/
-│   ├── compression_service.dart       # Binary-search compression engine
+│   ├── compression_service.dart       # Verified native compression jobs
 │   ├── crop_service.dart              # Interactive image cropping
 │   ├── exif_service.dart              # Native EXIF/GPS extraction & stripping
 │   ├── lanczos_resizer.dart           # Offline software resizer
@@ -203,3 +215,13 @@ For vulnerability reporting and details on our privacy guarantees, see [SECURITY
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+### Native image regression tests
+
+With an Android device connected, run `cd android` then
+`./gradlew :app:connectedDebugAndroidTest -PisolatedImageTests`.
+This uses a separate `.imagetest` application ID and generated fixtures;
+it does not replace the installed ReSinc app. Tests cover crop orientation,
+metadata handling, byte ceilings, failure cleanup, and a timed 12 MP fixture.
+Timing logs use the `ReSincBenchmark` tag. Remove the `.imagetest` and
+`.imagetest.test` apps after testing.

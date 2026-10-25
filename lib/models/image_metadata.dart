@@ -4,7 +4,12 @@ class ImageMetadata {
   final String fileName;
   final int width;
   final int height;
+
+  /// Size of the current working file (which may be a temporary crop).
   final int fileSizeBytes;
+
+  /// Size of the user-selected source, retained across crop operations.
+  final int originalSizeBytes;
   final Map<String, Object> exifTags;
   final bool hasGps;
   final double? latitude;
@@ -16,11 +21,12 @@ class ImageMetadata {
     required this.width,
     required this.height,
     required this.fileSizeBytes,
+    int? originalSizeBytes,
     required this.exifTags,
     this.hasGps = false,
     this.latitude,
     this.longitude,
-  });
+  }) : originalSizeBytes = originalSizeBytes ?? fileSizeBytes;
 
   int get tagCount => exifTags.length;
 

@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../widgets/file_preview.dart';
+
 import '../../../models/compression_result.dart';
 import '../../../utils/constants.dart';
 import 'hud/compression_comparison_card.dart';
@@ -94,7 +96,7 @@ class CompressionHUD extends StatelessWidget {
                   child: SizedBox(
                     height: 180,
                     width: double.infinity,
-                    child: Image.file(
+                    child: FilePreview(
                       File(result.compressedPath),
                       fit: BoxFit.cover,
                     ),

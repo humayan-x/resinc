@@ -1,46 +1,74 @@
-# Compression algorithm
+# Image processing in v1.0.1
 
-The byte ceiling is an acceptance condition, not an estimate from JPEG quality.
-For KB presets, 1 KB means 1,000 bytes, and the encoding budget is 99% of the
-selected limit. Resolution-only presets constrain the longest edge, not bytes.
-Custom KB targets below 50 are rejected in the input, model, and service; old
-saved targets below 50 are excluded when loaded.
+## Android background worker
 
-## Implemented plan
+`ImageProcessor.kt` runs on a serial Flutter platform-channel background task queue.
+The UI sends file paths and settings, not pixel buffers. Each job decodes once,
+normalizes EXIF orientation, draws an optional crop onto white, and retains a
+native bitmap for JPEG trials. Jobs are serialized to avoid multiplying memory
+usage. No intermediate PNG or Dart Lanczos pass is used on Android.
 
-1. Decode the original once, using Flutter's image decoder and its orientation
-   handling. Flatten transparency onto white for JPEG output.
-2. Produce each resolution directly from the original pixels with separable
-   Lanczos3. Widen the filter support when reducing dimensions to suppress
-   aliasing, normalize weights at borders, and perform filtering in an isolate.
-   Cache a lossless PNG for repeated JPEG quality trials at the same resolution.
-3. Search native JPEG quality 40–95 at each resolution. If no measured candidate
-   fits, reduce dimensions proportionally using a pixel-area estimate and retry,
-   for at most 32 levels. Prefer reducing resolution over extreme JPEG artifacts.
-4. When requested, copy supported EXIF tags before measuring, normalize orientation
-   and dimension tags, and exclude thumbnails. Metadata counts against the budget.
-5. Return only a measured candidate within budget. If none fits, report failure
-   and delete temporary attempts. Never return an oversized fallback.
-6. Carry the selected byte limit with the result. Recheck file length before
-   sharing and before gallery export, including the copy sent to the gallery.
+Native sampled decoding reduces large inputs before the working bitmap is built.
+The working image is bounded to 4,000,000 pixels and a 2560-pixel longest edge.
+The 1080p and 720p presets cap the longest edge at 1920 and 1280 respectively;
+small sources are never enlarged. Cropping uses normalized coordinates in the
+orientation-corrected image and starts from the original selected photo.
 
-The previous code already checked candidate sizes; an oversize reproduction was
-not available. The new export checks close a gap where a changed result could
-previously be saved or shared without revalidation.
+## Byte limits and quality
 
-## Sources and rationale
+- KB is decimal: 1 KB = 1000 bytes. Optimization aims 1% below the selected ceiling.
+- KB jobs try JPEG qualities 85, 65, and 45, returning the first result that fits.
+  This deliberately favors speed over an exhaustive best-quality search.
+- If no quality fits, the next scale follows the square root of budget/output
+  bytes, clamped to 0.4–0.9 with 5% additional headroom. Retry at the smaller size,
+  always scaling from the retained bitmap rather than a previous JPEG.
+- Resolution-only jobs encode once at their configured quality (normally 80).
+- Crop jobs use the current source file size as their byte ceiling. They can
+  reduce quality and dimensions if necessary.
+- At most 24 resolution levels are attempted. An impossible limit returns an
+  error and removes the partial output.
 
-- Android JPEG quality controls the size/quality tradeoff, not an exact byte size:
-  https://developer.android.com/reference/android/graphics/Bitmap.CompressFormat
-- libvips uses Lanczos3 for its final reduction:
-  https://www.libvips.org/API/8.17/method.Image.resize.html
-- Pillow describes Lanczos as a truncated-sinc filter considering contributing pixels:
-  https://pillow.readthedocs.io/en/stable/handbook/concepts.html
+If EXIF preservation is selected, attributes are written before measuring the
+final bytes; orientation and size tags are updated. Stripped exports do not copy
+source EXIF. Dart verifies the returned file length and ceiling, and saving or
+sharing verifies the file again.
 
-The quality floor, 1% headroom, retry bound, and export checks are application
-policy, not guarantees supplied by these libraries. Tests cover size boundaries,
-failed encodes, impossible budgets, mutated outputs, filter behavior and the
-raster/encoder handoff. Native JPEG and EXIF calls are mocked in host tests;
-physical-device testing with large photos, rotated images and metadata-heavy
-inputs is still needed. Full-resolution decoding uses memory proportional to
-source pixels. Third-party apps may independently re-encode shared images.
+## Metrics and fallback
+
+Original source size survives crop operations, so the reduction figure compares
+the exported file with the user-selected original. It is not freed disk space:
+the original, gallery export, and local saved copy may all still exist.
+
+The previous Dart/native-plugin pipeline remains the non-Android fallback and
+supports its existing unit tests. Android worker behavior has separate native
+instrumentation tests and Dart channel-contract tests. Processing duration is
+measured per job; no universal latency guarantee is made.
+
+## Validation
+
+Run `flutter test --concurrency=2` and `flutter analyze`. With an Android device
+connected, from `android/` run:
+
+```sh
+./gradlew :app:connectedDebugAndroidTest -PisolatedImageTests
+```
+
+This installs a separate `.imagetest` package. Tests generate their own images,
+check orientation, metadata, byte limits, dimensions, and failed-job cleanup,
+and log a 12-megapixel fixture's processing duration under `ReSincBenchmark`.
+
+### Device measurement (2026-10-25)
+
+On the connected Android device, the native tests processed a generated
+4000×3000 noisy JPEG in the debug test app:
+
+| Operation | Native job time | JPEG attempts | Output bytes |
+| --- | ---: | ---: | ---: |
+| Crop to the central 80% of each axis | 280 ms | 1 | 1,444,873 |
+| Optimize to the 200 KB preset (198,000-byte budget) | 482 ms | 5 | 185,683 |
+
+These measurements cover the native decode-to-output job, not image selection,
+preview loading, or gallery export. They are one fixture on one device, not a
+before/after benchmark or a universal latency guarantee. All three native
+instrumentation tests passed, including orientation/metadata and failed-job
+cleanup. The isolated test packages were removed afterwards.

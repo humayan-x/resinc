@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'lanczos_encoder.dart';
+import 'native_image_processor.dart';
 
 import 'package:path_provider/path_provider.dart';
 
@@ -22,14 +23,19 @@ typedef ImageEncoder = Future<String?> Function(
 
 class CompressionService {
   final ImageEncoder? _encode;
+  final NativeImageProcessor? _native;
   final Future<Directory> Function() _temporaryDirectory;
   final Future<(int, int)> Function(String) _dimensions;
 
   CompressionService({
     ImageEncoder? encoder,
+    NativeImageProcessor? nativeProcessor,
     Future<Directory> Function()? temporaryDirectory,
     Future<(int, int)> Function(String)? dimensions,
   }) : _encode = encoder,
+       _native =
+           nativeProcessor ??
+           (Platform.isAndroid ? NativeImageProcessor() : null),
        _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory,
        _dimensions = dimensions ?? readDimensions;
 
@@ -46,9 +52,40 @@ class CompressionService {
     String? winner;
     int iterations = 0;
     try {
+      if (_encode == null && _native != null) {
+        final target = options.effectiveTargetBytes;
+        final output = '${job.path}/output.jpg';
+        final processed = await _native.process(
+          source: metadata.path,
+          output: output,
+          budget: target == null ? null : target * 99 ~/ 100,
+          maxDimension: options.preset.targetWidth,
+          quality: target == null ? options.defaultQuality : 85,
+          keepExif: !options.stripExif,
+          exif: metadata.exifTags,
+        );
+        stopwatch.stop();
+        return CompressionResult(
+          originalPath: metadata.path,
+          compressedPath: output,
+          originalSizeBytes: metadata.originalSizeBytes,
+          compressedSizeBytes: processed.bytes,
+          maxSizeBytes: target,
+          outputWidth: processed.width,
+          outputHeight: processed.height,
+          exifStripped: options.stripExif,
+          processingTime: stopwatch.elapsed,
+          iterationsCount: processed.attempts,
+        );
+      }
       // Read the decoded image rather than trusting potentially stale EXIF sizes.
       final raster = _encode == null
-          ? await LanczosEncoder.open(metadata.path, job, metadata.exifTags)
+          ? await LanczosEncoder.open(
+              metadata.path,
+              job,
+              metadata.exifTags,
+              maxDimension: options.preset.targetWidth,
+            )
           : null;
       final encode = _encode ?? raster!.encode;
       final sourceSize = raster == null
@@ -130,7 +167,7 @@ class CompressionService {
       final result = CompressionResult(
         originalPath: metadata.path,
         compressedPath: winner,
-        originalSizeBytes: metadata.fileSizeBytes,
+        originalSizeBytes: metadata.originalSizeBytes,
         compressedSizeBytes: size,
         maxSizeBytes: target,
         outputWidth: dimensions.$1,

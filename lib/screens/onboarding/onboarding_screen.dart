@@ -49,7 +49,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(
           builder: (context) => HomeNavigationScreen(
-            themeController: widget.themeController ??
+            themeController:
+                widget.themeController ??
                 ThemeController(preferencesService: widget.preferencesService),
             preferencesService: widget.preferencesService,
           ),
@@ -111,15 +112,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         actions: [
           TextButton(
             onPressed: _finishOnboarding,
-            style: TextButton.styleFrom(
-              foregroundColor: mutedColor,
-            ),
+            style: TextButton.styleFrom(foregroundColor: mutedColor),
             child: const Text(
               'Skip',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
             ),
           ),
           const SizedBox(width: 8),
@@ -139,22 +135,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   _buildSlide(
                     title: 'Hit Strict Target Size Ceilings',
-                    subtitle:
-                        'Need an image under 100 KB for a portal, email, or application form? ReSinc uses iterative binary search to guarantee strict target ceilings without guessing quality.',
+                    subtitle: 'Need an image under 100 KB for a portal, email, or application form? ReSinc adjusts image quality and dimensions, then verifies the output fits your chosen limit.',
                     textColor: textColor,
                     mutedColor: mutedColor,
                   ),
                   _buildSlide(
                     title: 'Zero Cloud. 100% On-Device.',
-                    subtitle:
-                        'Zero network permissions in the manifest. Your photos never leave your hardware, never touch external servers, and work seamlessly in airplane mode.',
+                    subtitle: 'Zero network permissions in the manifest. Your photos never leave your hardware, never touch external servers, and work seamlessly in airplane mode.',
                     textColor: textColor,
                     mutedColor: mutedColor,
                   ),
                   _buildSlide(
                     title: 'Purge Hidden EXIF & GPS Tags',
-                    subtitle:
-                        'Camera parameters, device serial numbers, and exact GPS coordinates are automatically stripped on export. Non-destructive: your original files remain untouched.',
+                    subtitle: 'Camera parameters, device serial numbers, and exact GPS coordinates are automatically stripped on export. Non-destructive: your original files remain untouched.',
                     textColor: textColor,
                     mutedColor: mutedColor,
                   ),
@@ -183,8 +176,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           color: isActive
                               ? AppConstants.primaryAccent
                               : (isDark
-                                  ? AppConstants.borderDark
-                                  : AppConstants.borderLight),
+                                    ? AppConstants.borderDark
+                                    : AppConstants.borderLight),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -203,7 +196,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               curve: Curves.easeOutCubic,
                             );
                           },
-                          icon: Icon(Icons.arrow_back_rounded, color: textColor),
+                          icon: Icon(
+                            Icons.arrow_back_rounded,
+                            color: textColor,
+                          ),
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(
                               color: isDark

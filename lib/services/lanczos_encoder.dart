@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -8,7 +9,7 @@ import 'package:native_exif/native_exif.dart';
 
 import 'lanczos_resizer.dart';
 
-/// One decoded original per job; one lossless resized raster per resolution.
+/// One bounded decoded raster per job; one lossless raster per resolution.
 class LanczosEncoder {
   final Uint8List pixels;
   final int width;
@@ -23,11 +24,16 @@ class LanczosEncoder {
   static Future<LanczosEncoder> open(
     String path,
     Directory job,
-    Map<String, Object> exif,
-  ) async {
+    Map<String, Object> exif, {
+    int? maxDimension,
+  }) async {
     final buffer = await ui.ImmutableBuffer.fromFilePath(path);
     // This call takes ownership of the encoded buffer.
-    final codec = await ui.instantiateImageCodecFromBuffer(buffer);
+    final codec = await ui.instantiateImageCodecWithSize(
+      buffer,
+      getTargetSize: (width, height) =>
+          decodeSize(width, height, maxDimension: maxDimension),
+    );
     try {
       final frame = await codec.getNextFrame();
       try {
@@ -48,6 +54,27 @@ class LanczosEncoder {
     } finally {
       codec.dispose();
     }
+  }
+
+  /// Bound all subsequent RGBA buffers, including KB-target jobs. Resolution
+  /// presets can impose a smaller limit. Never upscale the input.
+  static ui.TargetImageSize decodeSize(
+    int width,
+    int height, {
+    int? maxDimension,
+  }) {
+    final edge = math.min(maxDimension ?? 2560, 2560);
+    final scale = math.min(
+      1.0,
+      math.min(
+        edge / math.max(width, height),
+        math.sqrt(4000000 / (width * height)),
+      ),
+    );
+    return ui.TargetImageSize(
+      width: math.max(1, (width * scale).floor()),
+      height: math.max(1, (height * scale).floor()),
+    );
   }
 
   Future<String?> encode(

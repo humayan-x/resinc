@@ -43,64 +43,102 @@ class SavedTab extends StatelessWidget {
             ),
             actions: [
               IconButton(
-                onPressed: controller.loadSaved,
+                onPressed: controller.isBusy ? null : controller.loadSaved,
                 icon: Icon(Icons.refresh, color: mutedColor),
                 tooltip: 'Refresh Saved',
               ),
               const SizedBox(width: 8),
             ],
           ),
-          body: RefreshIndicator(
-            onRefresh: controller.loadSaved,
-            color: AppConstants.primaryAccent,
-            backgroundColor: isDark
-                ? AppConstants.surfaceDark
-                : AppConstants.surfaceLight,
-            child: controller.isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppConstants.primaryAccent,
-                    ),
-                  )
-                : controller.itemCount == 0
-                ? const SavedEmptyState()
-                : Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      slivers: [
-                        SliverToBoxAdapter(
-                          child: SavedStatsHeader(
-                            totalSavedBytes: controller.totalSavedBytes,
-                            itemCount: controller.itemCount,
-                            onClearAll: controller.clearSaved,
-                          ),
+          body: Column(
+            children: [
+              if (controller.errorMessage != null)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          controller.errorMessage!,
+                          style: const TextStyle(color: AppConstants.alertRed),
                         ),
-                        SliverGrid(
-                          gridDelegate:
-                              const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 3,
-                                crossAxisSpacing: 8,
-                                mainAxisSpacing: 8,
-                                childAspectRatio: 1.0,
-                              ),
-                          delegate: SliverChildBuilderDelegate((
-                            context,
-                            index,
-                          ) {
-                            final item = controller.items[index];
-                            return SavedGridItem(
-                              item: item,
-                              onTap: () => _openDetailDialog(context, item),
-                              onShare: () => controller.shareItem(item),
-                            );
-                          }, childCount: controller.items.length),
-                        ),
-                        // Clearance for floating bottom nav bar
-                        const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                      ],
-                    ),
+                      ),
+                      TextButton(
+                        onPressed: controller.isBusy
+                            ? null
+                            : controller.loadSaved,
+                        child: const Text('Refresh'),
+                      ),
+                    ],
                   ),
+                ),
+              if (controller.isBusy && controller.itemCount > 0)
+                const LinearProgressIndicator(),
+              Expanded(
+                child: AbsorbPointer(
+                  absorbing: controller.isBusy,
+                  child: RefreshIndicator(
+                    onRefresh: controller.loadSaved,
+                    color: AppConstants.primaryAccent,
+                    backgroundColor: isDark
+                        ? AppConstants.surfaceDark
+                        : AppConstants.surfaceLight,
+                    child: controller.isLoading && controller.itemCount == 0
+                        ? const Center(
+                            child: CircularProgressIndicator(
+                              color: AppConstants.primaryAccent,
+                            ),
+                          )
+                        : controller.itemCount == 0
+                        ? controller.errorMessage != null
+                              ? const Center(
+                                  child: Text('Saved history is unavailable.'),
+                                )
+                              : const SavedEmptyState()
+                        : Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            child: CustomScrollView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              slivers: [
+                                SliverToBoxAdapter(
+                                  child: SavedStatsHeader(
+                                    totalSavedBytes: controller.totalSavedBytes,
+                                    itemCount: controller.itemCount,
+                                    onClearAll: controller.clearSaved,
+                                  ),
+                                ),
+                                SliverGrid(
+                                  gridDelegate:
+                                      const SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: 3,
+                                        crossAxisSpacing: 8,
+                                        mainAxisSpacing: 8,
+                                        childAspectRatio: 1.0,
+                                      ),
+                                  delegate: SliverChildBuilderDelegate((
+                                    context,
+                                    index,
+                                  ) {
+                                    final item = controller.items[index];
+                                    return SavedGridItem(
+                                      item: item,
+                                      onTap: () =>
+                                          _openDetailDialog(context, item),
+                                      onShare: () => controller.shareItem(item),
+                                    );
+                                  }, childCount: controller.items.length),
+                                ),
+                                // Clearance for floating bottom nav bar
+                                const SliverToBoxAdapter(
+                                  child: SizedBox(height: 100),
+                                ),
+                              ],
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
           ),
         );
       },

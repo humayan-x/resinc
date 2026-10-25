@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../models/compression_result.dart';
 import '../../../../utils/constants.dart';
 
-/// Card displaying Original, Optimized, and Saved metrics with visual flow indicator.
+/// Card displaying Original, Optimized, and Reduction metrics with visual flow indicator.
 class CompressionComparisonCard extends StatelessWidget {
   final CompressionResult result;
   final Color cardColor;
@@ -45,7 +45,7 @@ class CompressionComparisonCard extends StatelessWidget {
             color: AppConstants.primaryAccent,
           ),
           _buildMetricColumn(
-            label: 'SAVED',
+            label: 'REDUCTION',
             value: result.bytesSavedFormatted,
             subValue: '${result.processingTime.inMilliseconds} ms',
             color: AppConstants.primaryAccentLight,

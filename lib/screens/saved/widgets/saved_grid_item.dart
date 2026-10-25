@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../widgets/file_preview.dart';
+
 import '../../../models/saved_item.dart';
 import '../../../utils/constants.dart';
 
@@ -48,7 +50,7 @@ class SavedGridItem extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               // Square image
-              Image.file(
+              FilePreview(
                 File(item.filePath),
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => Container(

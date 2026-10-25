@@ -17,13 +17,11 @@ class SavedService {
   final Future<List<String>> Function(List<String> fileNames)? galleryChecker;
   Directory? _savedDir;
 
-  static const MethodChannel _galleryChannel =
-      MethodChannel('io.github.humayanx.resinc/gallery');
+  static const MethodChannel _galleryChannel = MethodChannel(
+    'io.github.humayanx.resinc/gallery',
+  );
 
-  SavedService({
-    this.directoryProvider,
-    this.galleryChecker,
-  });
+  SavedService({this.directoryProvider, this.galleryChecker});
 
   Future<Directory> _getSavedDirectory() async {
     if (_savedDir != null && await _savedDir!.exists()) {
@@ -49,7 +47,7 @@ class SavedService {
         'getExistingGalleryImages',
         {'fileNames': fileNames},
       );
-      return result?.map((e) => e.toString()).toList() ?? fileNames;
+      return result?.cast<String>() ?? fileNames;
     } catch (e) {
       debugPrint('Error checking gallery images: $e');
       return fileNames;
@@ -133,8 +131,7 @@ class SavedService {
                   id: map['id']?.toString() ?? entity.path,
                   filePath: entity.path,
                   fileName: map['fileName']?.toString() ?? fileName,
-                  fileSizeBytes:
-                      map['fileSizeBytes'] as int? ?? await entity.length(),
+                  fileSizeBytes: await entity.length(),
                   originalSizeBytes:
                       map['originalSizeBytes'] as int? ?? await entity.length(),
                   createdAt:
@@ -148,6 +145,8 @@ class SavedService {
                 ),
               );
               continue;
+            } on FileSystemException {
+              rethrow;
             } catch (e) {
               debugPrint('Error parsing saved meta file: $e');
             }
@@ -178,7 +177,17 @@ class SavedService {
       // Verify each item against gallery existence
       final fileNames = items.map((i) => i.fileName).toList();
       final checker = galleryChecker ?? _defaultGalleryChecker;
-      final existingFileNames = (await checker(fileNames)).toSet();
+      final Set<String> existingFileNames;
+      try {
+        // Only a successful, complete check can authorize removing references.
+        existingFileNames = (await checker(fileNames)).toSet();
+      } catch (e) {
+        debugPrint(
+          'Gallery verification unavailable; keeping saved history: $e',
+        );
+        items.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        return items;
+      }
 
       final List<SavedItem> verifiedItems = [];
       for (final item in items) {
@@ -195,7 +204,7 @@ class SavedService {
       return verifiedItems;
     } catch (e) {
       debugPrint('Error loading saved items: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -212,6 +221,7 @@ class SavedService {
       }
     } catch (e) {
       debugPrint('Error deleting saved item: $e');
+      rethrow;
     }
   }
 
@@ -229,10 +239,11 @@ class SavedService {
       }
     } catch (e) {
       debugPrint('Error clearing saved items: $e');
+      rethrow;
     }
   }
 
-  /// Aggregates cumulative bytes saved across all saved items.
+  /// Aggregates file-size reductions, not disk space freed.
   int calculateTotalSavedBytes(List<SavedItem> items) {
     int total = 0;
     for (final item in items) {

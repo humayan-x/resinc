@@ -112,15 +112,20 @@ class WorkbenchController extends ChangeNotifier {
   bool _isCompressing = false;
   bool _isSavedToGallery = false;
   String? _errorMessage;
+  Future<void>? _pickerRecovery;
 
   WorkbenchController({
     ExifService? exifService,
     ImagePicker? picker,
     CropService? cropService,
+    bool? recoverLostSelection,
   }) : _exifService = exifService ?? ExifService(),
        _picker = picker ?? ImagePicker(),
        _cropService = cropService ?? CropService() {
     _loadCustomPresets();
+    if (recoverLostSelection ?? Platform.isAndroid) {
+      unawaited(recoverLostImage());
+    }
   }
 
   // Getters
@@ -202,6 +207,47 @@ class WorkbenchController extends ChangeNotifier {
     await _persistCustomPresets();
   }
 
+  /// Android may restart the app while the system picker is open. Recover once
+  /// per controller lifetime, before allowing a new selection to start.
+  Future<void> recoverLostImage() => _pickerRecovery ??= _recoverLostImage();
+
+  Future<void> _recoverLostImage() async {
+    if (_disposed || isBusy || hasImage) return;
+    _isInspecting = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      final response = await _picker.retrieveLostData();
+      if (_disposed || response.isEmpty) return;
+      if (response.exception != null) throw response.exception!;
+      final files = response.files;
+      if (files != null && files.isNotEmpty) {
+        await _loadPickedImage(files.first);
+      }
+    } catch (_) {
+      if (!_disposed) {
+        _errorMessage = 'Could not restore your photo. Please select it again.';
+      }
+    } finally {
+      _isInspecting = false;
+      notifyListeners();
+    }
+  }
+
+  /// Normal selections and recovered selections use the same inspection and
+  /// state reset. Keep the current image until the replacement is readable.
+  Future<void> _loadPickedImage(XFile picked) async {
+    if (_disposed) return;
+    final image = await _exifService.inspectImage(picked.path);
+    if (_disposed) return;
+    _discardResult();
+    _discardCrop();
+    _originalImage = image;
+    _selectedImage = image;
+    _cropSelection = CropSelection.full;
+    _isSavedToGallery = false;
+  }
+
   /// Launches the system photo gallery picker
   Future<void> pickImage() async {
     if (isBusy || _disposed) return;
@@ -212,18 +258,7 @@ class WorkbenchController extends ChangeNotifier {
       final picked = await _picker.pickImage(source: ImageSource.gallery);
       if (picked == null) return;
 
-      _isInspecting = true;
-      _discardResult();
-      _isSavedToGallery = false;
-      notifyListeners();
-
-      final image = await _exifService.inspectImage(picked.path);
-      if (!_disposed) {
-        _discardCrop();
-        _originalImage = image;
-        _selectedImage = image;
-        _cropSelection = CropSelection.full;
-      }
+      await _loadPickedImage(picked);
     } catch (e) {
       _errorMessage = 'Failed to load image: ${e.toString()}';
     } finally {

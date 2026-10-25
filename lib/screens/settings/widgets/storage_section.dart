@@ -30,7 +30,7 @@ class StorageSection extends StatelessWidget {
           style: TextStyle(color: textColor),
         ),
         content: Text(
-          'This will clear saved image references from the app. Original gallery images will not be affected.',
+          'This removes local photo copies and their history. Photos in your device gallery remain untouched.',
           style: TextStyle(color: mutedColor, fontSize: 13),
         ),
         actions: [
@@ -39,9 +39,10 @@ class StorageSection extends StatelessWidget {
             child: Text('Cancel', style: TextStyle(color: mutedColor)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              savedController.clearSaved();
+              final cleared = await savedController.clearSaved();
+              if (!context.mounted || !cleared) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Saved references cleared.'),
@@ -100,12 +101,33 @@ class StorageSection extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Saved References: ${savedController.itemCount} (${FileUtils.formatBytes(savedController.totalSavedBytes)} space saved)',
+                'Local photo copies: ${savedController.itemCount} (${FileUtils.formatBytes(savedController.localPhotoBytes)})',
                 style: TextStyle(color: mutedColor, fontSize: 12),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Original photos and gallery exports are kept separately. '
+                'File-size reduction does not mean device storage was freed. '
+                'Local photo size excludes history metadata.',
+                style: TextStyle(color: mutedColor, fontSize: 12),
+              ),
+              if (savedController.errorMessage != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  savedController.errorMessage!,
+                  style: const TextStyle(color: AppConstants.alertRed),
+                ),
+                TextButton(
+                  onPressed: savedController.isBusy
+                      ? null
+                      : savedController.loadSaved,
+                  child: const Text('Refresh saved history'),
+                ),
+              ],
               const SizedBox(height: 12),
               OutlinedButton.icon(
-                onPressed: savedController.itemCount > 0
+                onPressed:
+                    !savedController.isBusy && savedController.itemCount > 0
                     ? () => _showClearConfirmation(context)
                     : null,
                 style: OutlinedButton.styleFrom(
@@ -120,7 +142,11 @@ class StorageSection extends StatelessWidget {
                   ),
                 ),
                 icon: const Icon(Icons.delete_sweep_outlined, size: 18),
-                label: const Text('Clear Saved References'),
+                label: Text(
+                  savedController.isBusy
+                      ? 'Please wait…'
+                      : 'Clear Saved References',
+                ),
               ),
             ],
           ),

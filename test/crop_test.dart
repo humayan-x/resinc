@@ -117,6 +117,12 @@ void main() {
     codec.dispose();
     expect(await File(source.path).readAsBytes(), before);
     expect(result.exifTags, source.exifTags);
+    expect(result.fileSizeBytes, await File(result.path).length());
+    expect(result.originalSizeBytes, source.fileSizeBytes);
+    final recropped = await CropService(temporaryDirectory: () async => temp)
+        .crop(result, const Rect.fromLTWH(0, 0, .5, 1));
+    expect(recropped.originalSizeBytes, source.fileSizeBytes);
+    await CropService.deleteCrop(recropped.path);
     await CropService.deleteCrop(result.path);
     expect(await File(result.path).exists(), false);
     expect(await File(source.path).exists(), true);
@@ -169,6 +175,16 @@ void main() {
     'crop dialog presets and freeform dragging apply the selected area',
     (tester) async {
       Rect? selected;
+      Future<void> waitForCanvas() async {
+        final deadline = DateTime.now().add(const Duration(seconds: 5));
+        while (find.byKey(const Key('crop-canvas')).evaluate().isEmpty &&
+            DateTime.now().isBefore(deadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+          await tester.pump();
+        }
+        expect(find.byKey(const Key('crop-canvas')), findsOneWidget);
+      }
+
       await tester.pumpWidget(
         MaterialApp(
           home: Builder(
@@ -190,7 +206,7 @@ void main() {
       await tester.runAsync(() async {
         await tester.tap(find.text('Open'));
         await tester.pump();
-        await Future<void>.delayed(const Duration(milliseconds: 100));
+        await waitForCanvas();
       });
       await tester.pumpAndSettle();
       await tester.tap(find.text('1:1'));
@@ -203,6 +219,10 @@ void main() {
         const Offset(40, 20),
       );
       await tester.pump();
+      final applyButton = tester.widget<ElevatedButton>(
+        find.widgetWithText(ElevatedButton, 'Apply Crop'),
+      );
+      expect(applyButton.style!.foregroundColor!.resolve({}), Colors.white);
       await tester.tap(find.text('Apply Crop'));
       await tester.pumpAndSettle();
       await tester.runAsync(() async {
@@ -216,7 +236,7 @@ void main() {
         await tester.runAsync(() async {
           await tester.tap(find.text('Open'));
           await tester.pump();
-          await Future<void>.delayed(const Duration(milliseconds: 100));
+          await waitForCanvas();
         });
         await tester.pumpAndSettle();
       }

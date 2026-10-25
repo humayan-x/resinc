@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../../widgets/file_preview.dart';
+
 import '../../../../models/saved_item.dart';
 import '../../../../utils/constants.dart';
 
@@ -28,9 +30,10 @@ class SavedDetailPreview extends StatelessWidget {
           width: double.infinity,
           child: InteractiveViewer(
             clipBehavior: Clip.antiAlias,
-            child: Image.file(
+            child: FilePreview(
               File(item.filePath),
               fit: BoxFit.contain,
+              zoomAllowance: 2,
               errorBuilder: (context, error, stackTrace) => Container(
                 height: 200,
                 color: cardColor,

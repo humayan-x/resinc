@@ -33,7 +33,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "io.github.humayanx.resinc"
+        applicationId = "io.github.humayanx.resinc" +
+            if (providers.gradleProperty("isolatedImageTests").isPresent) ".imagetest" else ""
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -84,4 +86,10 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.exifinterface:exifinterface:1.4.2")
+    androidTestImplementation("androidx.test:runner:1.6.1")
+    androidTestImplementation("junit:junit:4.13.2")
 }

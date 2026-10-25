@@ -53,35 +53,20 @@ class WorkbenchTab extends StatelessWidget {
                       icon: const Icon(Icons.arrow_back),
                     )
                   : null,
-              title: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Image.asset(
-                    isDark ? AppConstants.logoWhite : AppConstants.logoDark,
-                    height: 28,
-                    width: 28,
-                    fit: BoxFit.contain,
-                  ),
-                  const SizedBox(width: 3),
-                  Text(
-                    AppConstants.appName,
-                    style: TextStyle(
-                      color: textColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 22,
-                      letterSpacing: -0.5,
-                    ),
-                  ),
-                ],
+              title: Text(
+                AppConstants.appName,
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  letterSpacing: -0.5,
+                ),
               ),
               actions: [
                 if (onOpenGuide != null)
                   IconButton(
                     onPressed: onOpenGuide,
-                    icon: Icon(
-                      Icons.help_outline_rounded,
-                      color: textColor,
-                    ),
+                    icon: Icon(Icons.help_outline_rounded, color: textColor),
                     tooltip: 'Quick Guide',
                   ),
                 IconButton(

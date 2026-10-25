@@ -271,7 +271,7 @@ class _CropImageDialogState extends State<CropImageDialog> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppConstants.primaryAccent,
-                          foregroundColor: AppConstants.backgroundDark,
+                          foregroundColor: Colors.white,
                           shape: buttonShape,
                           padding: const EdgeInsets.symmetric(horizontal: 8),
                           elevation: 0,

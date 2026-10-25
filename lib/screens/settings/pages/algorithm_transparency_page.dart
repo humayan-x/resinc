@@ -91,7 +91,7 @@ class AlgorithmTransparencyPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Iterative Downscaling • Binary Quality Search',
+                    'Native Background Processing • Verified Size Limits',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: AppConstants.primaryAccentLight,
@@ -117,7 +117,7 @@ class AlgorithmTransparencyPage extends StatelessWidget {
             _buildAlgorithmStep(
               stepNumber: '1',
               title: 'Native JPEG Encoding',
-              description: 'Images are decoded locally once. Each resolution is generated from the original pixels with Lanczos3 and reused for native JPEG quality trials.',
+              description: 'Android processes each photo on a background worker. It decodes once, keeps pixels in native memory, and reuses the bitmap for JPEG attempts. No photo data leaves your device.',
               surfaceColor: surfaceColor,
               cardColor: cardColor,
               borderColor: borderColor,
@@ -128,8 +128,8 @@ class AlgorithmTransparencyPage extends StatelessWidget {
 
             _buildAlgorithmStep(
               stepNumber: '2',
-              title: 'Lanczos3 Downscaling',
-              description: 'Scale-aware Lanczos3 filtering preserves aspect ratio and reduces aliasing. Resolution presets limit the longest edge without upscaling. Size targets may reduce dimensions and detail to fit.',
+              title: 'Native Filtered Downscaling',
+              description: 'Native filtered scaling preserves aspect ratio. Working images are capped at 4 megapixels and a 2560-pixel longest edge; resolution presets can impose a smaller limit. Cropping and small size targets may reduce detail.',
               surfaceColor: surfaceColor,
               cardColor: cardColor,
               borderColor: borderColor,
@@ -140,8 +140,8 @@ class AlgorithmTransparencyPage extends StatelessWidget {
 
             _buildAlgorithmStep(
               stepNumber: '3',
-              title: 'Multi-Pass Binary Ceiling Search',
-              description: 'Targets start at 50 KB. JPEG quality 40–95 is searched at each resolution, with up to 32 resize levels. Success requires the actual file size to be at or below the target (1 KB = 1000 bytes; encoding aims 1% below the limit). Metadata is included in the measured size. Files are checked again before saving or sharing. If no candidate fits, an error is shown.',
+              title: 'Fast Verified Ceiling Search',
+              description: 'Targets start at 50 KB. Android tries JPEG quality 85, 65, then 45 and returns the first result that fits. If needed, dimensions are reduced using measured output size. The final size includes metadata and aims 1% below the target (1 KB = 1000 bytes). Files are checked again before saving or sharing.',
               surfaceColor: surfaceColor,
               cardColor: cardColor,
               borderColor: borderColor,

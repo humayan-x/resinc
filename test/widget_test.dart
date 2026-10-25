@@ -56,6 +56,7 @@ void main() {
 
     // Verify title and navigation icons
     expect(find.text('ReSinc'), findsOneWidget);
+    expect(tester.widget<AppBar>(find.byType(AppBar).first).title, isA<Text>());
     expect(find.byIcon(Icons.home_rounded), findsOneWidget);
     expect(find.byIcon(Icons.photo_library_outlined), findsOneWidget);
     expect(find.byIcon(Icons.settings_outlined), findsOneWidget);

@@ -5,7 +5,7 @@ class AppConstants {
   // Brand info
   static const String appName = 'ReSinc';
   static const String appTagline = 'Offline Android Image Optimizer';
-  static const String appVersion = '1.0.0+1';
+  static const String appVersion = '1.0.1+2';
   static const String appId = 'io.github.humayanx.resinc';
   static const String githubRepoUrl = 'https://github.com/humayan-x/resinc';
   static const String githubIssuesUrl =

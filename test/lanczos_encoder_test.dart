@@ -9,6 +9,52 @@ import 'package:resinc/services/lanczos_encoder.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  test('decode budgets preserve proportions without upscaling', () {
+    for (final size in [(8000, 6000), (6000, 8000), (12000, 1000)]) {
+      final decoded = LanczosEncoder.decodeSize(size.$1, size.$2);
+      expect(decoded.width! * decoded.height!, lessThanOrEqualTo(4000000));
+      expect(decoded.width, lessThanOrEqualTo(2560));
+      expect(decoded.height, lessThanOrEqualTo(2560));
+      expect(
+        decoded.width! / decoded.height!,
+        closeTo(size.$1 / size.$2, 0.02),
+      );
+    }
+    final small = LanczosEncoder.decodeSize(320, 240, maxDimension: 1920);
+    expect((small.width, small.height), (320, 240));
+    final portrait = LanczosEncoder.decodeSize(3000, 4000, maxDimension: 1280);
+    expect((portrait.width, portrait.height), (960, 1280));
+  });
+
+  test('decoder produces bounded pixels before encoding', () async {
+    final temp = await Directory.systemTemp.createTemp('decode_budget_');
+    try {
+      final recorder = ui.PictureRecorder();
+      ui.Canvas(recorder)
+          .drawColor(const ui.Color(0xff205080), ui.BlendMode.src);
+      final picture = recorder.endRecording();
+      final image = await picture.toImage(3200, 2400);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      picture.dispose();
+      final source = File('${temp.path}/source.png');
+      await source.writeAsBytes(png!.buffer.asUint8List());
+      final preset = await LanczosEncoder.open(
+        source.path,
+        temp,
+        {},
+        maxDimension: 1920,
+      );
+      expect((preset.width, preset.height), (1920, 1440));
+      expect(preset.pixels.length, 1920 * 1440 * 4);
+      final kb = await LanczosEncoder.open(source.path, temp, {});
+      expect(kb.width * kb.height, lessThanOrEqualTo(4000000));
+      expect(kb.pixels.length, kb.width * kb.height * 4);
+    } finally {
+      await temp.delete(recursive: true);
+    }
+  });
+
   test(
     'decoded raster is resized once per level and metadata precedes return',
     () async {
